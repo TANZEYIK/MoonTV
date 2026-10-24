@@ -2,6 +2,22 @@
 import he from 'he';
 import Hls from 'hls.js';
 
+// Only Douban poster hosts need the Referer supplied by the same-origin proxy.
+export function getDoubanImageProxyUrl(originalUrl: string): string | null {
+  try {
+    const url = new URL(originalUrl);
+    if (
+      (url.protocol === 'https:' || url.protocol === 'http:') &&
+      /^img\d*\.doubanio\.com$/i.test(url.hostname)
+    ) {
+      return `/api/image-proxy?url=${encodeURIComponent(originalUrl)}`;
+    }
+  } catch {
+    // Relative paths and invalid URLs have no Douban fallback.
+  }
+  return null;
+}
+
 function getDoubanImageProxyConfig(): {
   proxyType:
     | 'direct'

@@ -14,7 +14,7 @@ import {
   subscribeToDataUpdates,
 } from '@/lib/db.client';
 import { SearchResult } from '@/lib/types';
-import { processImageUrl } from '@/lib/utils';
+import { getDoubanImageProxyUrl, processImageUrl } from '@/lib/utils';
 
 import { ImagePlaceholder } from '@/components/ImagePlaceholder';
 
@@ -276,6 +276,7 @@ export default function VideoCard({
         {!isLoading && <ImagePlaceholder aspectRatio='aspect-[2/3]' />}
         {/* 图片 */}
         <Image
+          key={actualPoster}
           src={processImageUrl(actualPoster)}
           alt={actualTitle}
           fill
@@ -284,8 +285,21 @@ export default function VideoCard({
           loading='lazy'
           onLoadingComplete={() => setIsLoading(true)}
           onError={(e) => {
-            // 图片加载失败时的重试机制
             const img = e.target as HTMLImageElement;
+            const fallbackUrl = getDoubanImageProxyUrl(actualPoster);
+            // Direct/CDN Douban requests can fail hotlink checks. Retry once
+            // through our edge proxy, which supplies the required Referer.
+            if (fallbackUrl && img.getAttribute('src') !== fallbackUrl) {
+              if (!img.dataset.retried) {
+                img.dataset.retried = 'true';
+                img.removeAttribute('srcset');
+                img.src = fallbackUrl;
+              }
+              return;
+            }
+            if (fallbackUrl) return;
+
+            // Keep the existing retry for non-Douban provider images.
             if (!img.dataset.retried) {
               img.dataset.retried = 'true';
               setTimeout(() => {
